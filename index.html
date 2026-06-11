@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Tic-Tac-Toe</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas" width="600" height="450"></canvas>
+  </div>
+
+  <script src="ui.js"></script>
+  <script>
+    // ── Game Logic ─────────────────────────────────────────────────
+    function createEmptyBoard() {
+      return Array.from({ length: 3 }, () =>
+        Array.from({ length: 3 }, () => Array(3).fill(0))
+      );
+    }
+
+    function getWinningLines() {
+      const lines = [];
+      for (let l = 0; l < 3; l++)
+        for (let r = 0; r < 3; r++)
+          lines.push([[l, r, 0], [l, r, 1], [l, r, 2]]);
+      for (let l = 0; l < 3; l++)
+        for (let c = 0; c < 3; c++)
+          lines.push([[l, 0, c], [l, 1, c], [l, 2, c]]);
+      for (let r = 0; r < 3; r++)
+        for (let c = 0; c < 3; c++)
+          lines.push([[0, r, c], [1, r, c], [2, r, c]]);
+      for (let l = 0; l < 3; l++) {
+        lines.push([[l, 0, 0], [l, 1, 1], [l, 2, 2]]);
+        lines.push([[l, 0, 2], [l, 1, 1], [l, 2, 0]]);
+      }
+      for (let r = 0; r < 3; r++) {
+        lines.push([[0, r, 0], [1, r, 1], [2, r, 2]]);
+        lines.push([[0, r, 2], [1, r, 1], [2, r, 0]]);
+      }
+      for (let c = 0; c < 3; c++) {
+        lines.push([[0, 0, c], [1, 1, c], [2, 2, c]]);
+        lines.push([[0, 2, c], [1, 1, c], [2, 0, c]]);
+      }
+      lines.push([[0,0,0],[1,1,1],[2,2,2]],[[0,0,2],[1,1,1],[2,2,0]]);
+      lines.push([[0,2,0],[1,1,1],[2,0,2]],[[0,2,2],[1,1,1],[2,0,0]]);
+      return lines;
+    }
+
+    const WINNING_LINES = getWinningLines();
+    let board = createEmptyBoard();
+    let currentPlayer = 1;
+    let gameState = "playing";
+    let winner = null;
+    let moveCount = 0;
+
+    function makeCellMove(layer, row, col) {
+      if (gameState !== "playing") return false;
+      if (board[layer][row][col] !== 0) return false;
+      board[layer][row][col] = currentPlayer;
+      moveCount++;
+      const winLine = checkWin();
+      if (winLine) {
+        gameState = "win";
+        winner = currentPlayer;
+        return { win: true, line: winLine };
+      } else if (moveCount >= 27) {
+        gameState = "draw";
+        return { draw: true };
+      }
+      currentPlayer = currentPlayer === 1 ? 2 : 1;
+      return { win: false };
+    }
+
+    function checkWin() {
+      for (const line of WINNING_LINES) {
+        const [a, b, d] = line;
+        const va = board[a[0]][a[1]][a[2]];
+        const vb = board[b[0]][b[1]][b[2]];
+        const vc = board[d[0]][d[1]][d[2]];
+        if (va !== 0 && va === vb && vb === vc) return line;
+      }
+      return null;
+    }
+
+    function resetGame() {
+      board = createEmptyBoard();
+      currentPlayer = 1;
+      gameState = "playing";
+      winner = null;
+      moveCount = 0;
+    }
+
+    function getCurrentPlayer() { return currentPlayer; }
+    function getWinner() { return winner; }
+    function getBoard() { return board; }
+    function getGameState() { return gameState; }
+
+    // ── 2D Canvas Renderer ──
+    let canvas, ctx;
+    const CELL = 60;
+    const PAD = 30;
+    const LAYER_GAP = 200;
+
+    function initRenderer() {
+      canvas = document.getElementById("game-canvas");
+      ctx = canvas.getContext("2d");
+    }
+
+    function drawBoard() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let l = 0; l < 3; l++) {
+        const ox = PAD + l * LAYER_GAP;
+        const oy = PAD;
+        ctx.fillStyle = "rgba(224,224,255,0.3)";
+        ctx.font = "14px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Layer " + (l + 1), ox + CELL * 1.5, oy - 8);
+        ctx.strokeStyle = "rgba(0,255,255,0.1)";
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 3; i++) {
+          ctx.beginPath(); ctx.moveTo(ox, oy + i * CELL); ctx.lineTo(ox + 3 * CELL, oy + i * CELL); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(ox + i * CELL, oy); ctx.lineTo(ox + i * CELL, oy + 3 * CELL); ctx.stroke();
+        }
+        for (let r = 0; r < 3; r++) {
+          for (let c = 0; c < 3; c++) {
+            const val = board[l][r][c];
+            const cx = ox + c * CELL + CELL / 2;
+            const cy = oy + r * CELL + CELL / 2;
+            if (val === 1) {
+              ctx.strokeStyle = "#00ffff";
+              ctx.lineWidth = 3;
+              ctx.shadowColor = "#00ffff"; ctx.shadowBlur = 12;
+              const s = 16;
+              ctx.beginPath(); ctx.moveTo(cx - s, cy - s); ctx.lineTo(cx + s, cy + s); ctx.stroke();
+              ctx.beginPath(); ctx.moveTo(cx + s, cy - s); ctx.lineTo(cx - s, cy + s); ctx.stroke();
+              ctx.shadowBlur = 0;
+            } else if (val === 2) {
+              ctx.strokeStyle = "#ff00ff";
+              ctx.lineWidth = 3;
+              ctx.shadowColor = "#ff00ff"; ctx.shadowBlur = 12;
+              ctx.beginPath(); ctx.arc(cx, cy, 16, 0, Math.PI * 2); ctx.stroke();
+              ctx.shadowBlur = 0;
+            }
+          }
+        }
+      }
+    }
+
+    // ── Click Handler ──
+    function setupInput() {
+      canvas.addEventListener("click", function (e) {
+        if (gameState !== "playing") return;
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const mx = (e.clientX - rect.left) * scaleX;
+        const my = (e.clientY - rect.top) * scaleY;
+
+        for (let l = 0; l < 3; l++) {
+          const ox = PAD + l * LAYER_GAP;
+          const oy = PAD;
+          if (mx >= ox && mx <= ox + 3 * CELL && my >= oy && my <= oy + 3 * CELL) {
+            const c = Math.floor((mx - ox) / CELL);
+            const r = Math.floor((my - oy) / CELL);
+
+            const result = makeCellMove(l, r, c);
+            const playerStr = currentPlayer === 1 ? "X" : "O";
+            window.TTT3D_UI.onCellPlaced(playerStr, l, r, c);
+
+            if (result && result.win) {
+              const winLine = result.line.map(([ll, rr, cc]) => ({ layer: ll, row: rr, col: cc }));
+              window.TTT3D_UI.onWin(currentPlayer === 1 ? "X" : "O", winLine);
+            } else if (result && result.draw) {
+              window.TTT3D_UI.onDraw();
+            }
+            drawBoard();
+            return;
+          }
+        }
+      });
+    }
+
+    // ── Init ──
+    initRenderer();
+    setupInput();
+
+    window.TTT3D_UI.init({
+      onReset: function () {
+        resetGame();
+        drawBoard();
+      },
+    });
+
+    drawBoard();
+  </script>
+</body>
+</html>
